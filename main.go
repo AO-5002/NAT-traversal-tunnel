@@ -2,19 +2,65 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"log"
+	"net"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
-func main() {
-	//TIP <p>Press <shortcut actionId="ShowIntentionActions"/> when your caret is at the underlined text
-	// to see how the IDE suggests fixing the warning.</p><p>Alternatively, if available, click the lightbulb to view possible fixes.</p>
-	s := "gopher"
-	fmt.Println("Hello and welcome, %s!", s)
+const BufferSize int = 1024
 
-	for i := 1; i <= 5; i++ {
-		//TIP <p>To start your debugging session, right-click your code in the editor and select the Debug option.</p> <p>We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-		// for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.</p>
-		fmt.Println("i =", 100/i)
+type Address struct {
+	network string
+	address string
+	port    string
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+	buf := make([]byte, BufferSize)
+
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				fmt.Println("Client disconnected.")
+			} else {
+				log.Println(err)
+			}
+			return
+		}
+
+		relayMessage := fmt.Sprintf("Server echoes: %s", buf[:n])
+		_, err = conn.Write([]byte(relayMessage))
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+	}
+}
+
+func main() {
+
+	// Create address we want to listen on
+	addr := Address{network: "tcp", address: "127.0.0.1", port: "8080"}
+
+	// Create, bind, listen on this address
+	ln, err := net.Listen(addr.network, net.JoinHostPort(addr.address, addr.port))
+	defer ln.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Listening on " + addr.address + ":" + addr.port + "...")
+
+	// Accept incoming connection
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Println(err)
+		}
+		handleConnection(conn)
 	}
 }
