@@ -11,7 +11,7 @@ I was building a separate application and wanted a friend to test it right away,
 ## Issues with Traditional Port Forwarding
 
 ![Port forwarding diagram](port-forward-visual.png)
-**** Suppose my friend Marc wants to connect to my local-application. 
+****Suppose my friend Marc wants to connect to my local-application. 
 
 - **Pokes a hole in the router's NAT/firewall**, letting unsolicited inbound traffic through
 - **Exposes your home public IP** to anyone who connects (DDoS, rough geolocation)
