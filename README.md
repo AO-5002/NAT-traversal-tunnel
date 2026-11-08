@@ -10,7 +10,7 @@ I was building a separate application and wanted a friend to test it right away,
 
 ## Issues with Traditional Port Forwarding
 
-![Port forwarding diagram](docs/port-forwarding.png)
+![Port forwarding diagram](port-forward-visual.png)
 
 - **Pokes a hole in the router's NAT/firewall**, letting unsolicited inbound traffic through
 - **Exposes your home public IP** to anyone who connects (DDoS, rough geolocation)
