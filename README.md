@@ -9,9 +9,9 @@ I was building a separate application and wanted a friend to test it right away,
 [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) came in clutch. With one command, I had a public link to my local app, with no port forwarding needed, and my friend was able to connect and test it. I'm easily impressed, but I couldn't stop wondering how it actually worked, so I decided to build my own.
 
 ## Issues with Traditional Port Forwarding
-
+*****Suppose my friend Marc wants to connect to my local-application, and port-scanner also wants to connect.*****
 ![Port forwarding diagram](port-forward-visual.png)
-****Suppose my friend Marc wants to connect to my local-application. 
+
 
 - **Pokes a hole in the router's NAT/firewall**, letting unsolicited inbound traffic through
 - **Exposes your home public IP** to anyone who connects (DDoS, rough geolocation)
