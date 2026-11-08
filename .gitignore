@@ -1,0 +1,28 @@
+# Binaries
+/bin/
+/relay
+/daemon
+*.exe
+*.test
+*.out
+
+# Go coverage and profiling
+coverage.*
+*.prof
+
+# Go workspace (local only)
+go.work
+go.work.sum
+
+# Environment and secrets
+.env
+*.env
+.env.*
+!.env.example
+
+# Editors
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
