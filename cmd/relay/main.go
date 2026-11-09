@@ -13,7 +13,7 @@ import (
 const BufferSize = 1024
 
 func main() {
-	ln, err := net.Listen(protocol.DestAddr.Network, ":8080")
+	ln, err := net.Listen(protocol.DestAddr.Network, ":"+protocol.DestAddr.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
