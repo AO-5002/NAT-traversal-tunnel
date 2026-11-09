@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"log"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -17,11 +16,7 @@ type Address struct {
 
 // Configure & Initialize .env variables into the destination-address struct.
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
+	_ = godotenv.Load()
 	envNetwork := os.Getenv("DEST_IPV4_NETWORK")
 	envHost := os.Getenv("DEST_IPV4_HOST")
 	envPort := os.Getenv("DEST_IPV4_PORT")

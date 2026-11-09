@@ -43,5 +43,4 @@ func main() {
 		fmt.Println(string(buf[:n]))
 		break
 	}
-
 }
