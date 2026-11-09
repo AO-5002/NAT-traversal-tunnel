@@ -26,6 +26,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+
 	defer conn.Close()
 
 	buf := make([]byte, BufferSize)
