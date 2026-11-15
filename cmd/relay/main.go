@@ -17,33 +17,54 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer ln.Close()
 
+	defer ln.Close()
 	fmt.Printf("Listening on %s:%s\n", protocol.DestAddr.Network, protocol.DestAddr.Port)
 
-	conn, err := ln.Accept()
-	if err != nil {
-		fmt.Println(err)
-		return
+	// Concurrency w/ Goroutines
+
+	userCount := 0
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			fmt.Println(err)
+		}
+		userCount++
+		fmt.Printf("Accepted connection from (User #%v) %s\n", userCount, conn.RemoteAddr())
+
+		go func() {
+			defer conn.Close()
+
+			// Read data from client
+			buf := make([]byte, BufferSize)
+			n, err := recv(buf, conn)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			// Write "ACK" back to the client
+			if err := send(buf, n, conn); err != nil {
+				fmt.Println(err)
+			}
+		}()
 	}
+}
 
-	defer conn.Close()
-
-	buf := make([]byte, BufferSize)
+func recv(buf []byte, conn net.Conn) (int, error) {
 	n, err := conn.Read(buf)
 	if err != nil {
 		if err == io.EOF {
 			fmt.Println("Connection closed.")
-		} else {
-			fmt.Println(err)
 		}
-		return
+		return 0, err
 	}
 
+	return n, nil
+}
+
+func send(buf []byte, n int, conn net.Conn) error {
 	relayMessage := fmt.Sprintf("ACK %s", buf[:n])
-	_, err = conn.Write([]byte(relayMessage))
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+	_, err := conn.Write([]byte(relayMessage))
+	return err
 }
