@@ -3,23 +3,51 @@ package main
 import (
 	"NAT-tunnel-project/internal/protocol"
 	"fmt"
-	"io"
 	"log"
 	"net"
+	"os"
+	"sync"
 )
 
 // EC2 Program
 
 const BufferSize = 1024
 
+type Hub struct {
+	mu    sync.Mutex
+	subs  map[net.Conn]chan []byte
+	pubId net.Conn
+}
+
+func (h *Hub) subscribe(conn net.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.subs[conn] = make(chan []byte, BufferSize)
+}
+
+// Send the pub's message to every sub's channel
+func (h *Hub) broadcast(msg []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, ch := range h.subs {
+		ch <- msg
+	}
+}
+
 func main() {
-	ln, err := net.Listen(protocol.DestAddr.Network, ":"+protocol.DestAddr.Port)
+	ln, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	defer ln.Close()
 	fmt.Printf("Listening on %s:%s\n", protocol.DestAddr.Network, protocol.DestAddr.Port)
+
+	secret := os.Getenv("RELAY_SECRET")
+	if secret == "" {
+		log.Fatal("RELAY_SECRET not set")
+	}
+	log.Println("secret loaded:", secret[:8]+"...")
 
 	// Concurrency w/ Goroutines
 
@@ -49,22 +77,4 @@ func main() {
 			}
 		}()
 	}
-}
-
-func recv(buf []byte, conn net.Conn) (int, error) {
-	n, err := conn.Read(buf)
-	if err != nil {
-		if err == io.EOF {
-			fmt.Println("Connection closed.")
-		}
-		return 0, err
-	}
-
-	return n, nil
-}
-
-func send(buf []byte, n int, conn net.Conn) error {
-	relayMessage := fmt.Sprintf("ACK %s", buf[:n])
-	_, err := conn.Write([]byte(relayMessage))
-	return err
 }

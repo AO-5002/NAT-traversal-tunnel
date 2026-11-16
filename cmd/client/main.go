@@ -8,13 +8,27 @@ import (
 	"log"
 	"net"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 const BufferSize = 1024
 
 func main() {
 
-	conn, err := net.Dial(protocol.DestAddr.Network, net.JoinHostPort(protocol.DestAddr.Host, protocol.DestAddr.Port))
+	if err := godotenv.Load("internal/protocol/.env"); err != nil {
+		log.Fatal(err)
+	}
+
+	// Get the .env properties from the local .env file in /internal/protocol
+	addr := protocol.Address{
+		Network: os.Getenv("DEST_IPV4_NETWORK"),
+		Host:    os.Getenv("DEST_IPV4_HOST"),
+		Port:    os.Getenv("DEST_IPV4_PORT"),
+	}
+
+	// Connect to the relay-server in the EC2 instance.
+	conn, err := net.Dial(addr.Network, net.JoinHostPort(addr.Host, addr.Port))
 	if err != nil {
 		log.Fatal(err)
 	}
