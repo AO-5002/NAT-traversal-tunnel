@@ -35,7 +35,7 @@ func (h *Hub) broadcast(msg []byte) {
 }
 
 func main() {
-	ln, err := net.Listen(protocol.DestAddr.Network, ":"+protocol.DestAddr.Port)
+	ln, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		log.Fatal(err)
 	}

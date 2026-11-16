@@ -48,7 +48,7 @@ EC2="$DEST_IPV4_USER@$DEST_IPV4_HOST"
 grep '^RELAY_SECRET=' "$ENV_FILE" | ssh -i "$DEST_SSH_KEY" "$EC2" 'umask 077; mkdir -p ~/relay; cat > ~/relay/.env' || { echo "Failed to send secret"; exit 1; }
 
 # Build the relay image and send it to the EC2
-docker build --platform linux/amd64 -t relay . || exit 1
+docker build --platform linux/arm64 -t relay . || exit 1
 docker save relay | ssh -i "$DEST_SSH_KEY" "$EC2" 'docker load' || exit 1
 
 # Start the relay (removes the old one first)
