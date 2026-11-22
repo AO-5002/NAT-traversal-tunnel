@@ -51,6 +51,7 @@ func main() {
 			p, err := protocol.RecvPacket(conn)
 			if err != nil {
 				fmt.Printf("Error receiving connected-client packet: %s", err)
+				return
 			}
 
 			// Create a TCP connection to local-url application.
@@ -70,13 +71,13 @@ func main() {
 
 			// Receive whatever bytes as a response and send it back to the connected client/s
 
+			originId := p.GetId()
 			buf := make([]byte, BufferSize)
 			for {
 				n, err := localConn.Read(buf)
 				if n > 0 {
-					originId := p.GetId()
 					forwardedResponse := protocol.NewPacket(originId, buf[:n])
-					err = protocol.SendPacket(forwardedResponse, conn)
+					protocol.SendPacket(forwardedResponse, conn)
 				}
 				if err != nil {
 					localConn.Close()
@@ -84,6 +85,8 @@ func main() {
 				}
 			}
 
+			// Send sentinel to signal end of response
+			protocol.SendPacket(protocol.NewPacket(originId, []byte{}), conn)
 			localConn.Close()
 		}
 	}

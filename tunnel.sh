@@ -35,6 +35,7 @@ if $CREATE_ENV; then
   echo "DEST_IPV4_NETWORK=tcp" >> $ENV_FILE
   echo "DEST_IPV4_HOST=$SSH_HOST" >> $ENV_FILE
   echo "DEST_IPV4_PORT=$SSH_PORT" >> $ENV_FILE
+  echo "LOCAL_URL=$LOCAL_URL" >> $ENV_FILE
 
   # Alter perms on the file
   chmod 600 $ENV_FILE
