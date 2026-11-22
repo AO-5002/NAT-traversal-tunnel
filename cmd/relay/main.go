@@ -12,7 +12,7 @@ import (
 
 // EC2 Program
 
-const BufferSize = 1024
+const BufferSize = 64 * 1024
 
 var nextStreamID atomic.Uint32
 

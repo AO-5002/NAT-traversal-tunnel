@@ -10,7 +10,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-const BufferSize = 1024
+const BufferSize = 64 * 1024
 
 func main() {
 
