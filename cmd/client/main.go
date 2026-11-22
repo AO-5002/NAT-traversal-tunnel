@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
 )
+
+const BufferSize = 1024
 
 func main() {
 
@@ -42,11 +43,49 @@ func main() {
 
 	if authenticated {
 		fmt.Printf("Successfully connected to: %s\n", conn.RemoteAddr())
-		_, err := http.Post(url, "application/json", nil)
-		if err != nil {
-			fmt.Println(err)
-		}
 
+		for {
+
+			// Receive packet from connected-client
+
+			p, err := protocol.RecvPacket(conn)
+			if err != nil {
+				fmt.Printf("Error receiving connected-client packet: %s", err)
+			}
+
+			// Create a TCP connection to local-url application.
+
+			localConn, err := net.Dial(addr.Network, url)
+			if err != nil {
+				fmt.Printf("Failed to connect to local-host application on URL: %s: %s\n", url, err)
+				log.Fatal(err)
+			}
+
+			// Forward the request to connected local-host application
+
+			if _, err := localConn.Write(p.GetPayload()); err != nil {
+				fmt.Printf("Error forwarding payload: %s", err)
+				log.Fatal(err)
+			}
+
+			// Receive whatever bytes as a response and send it back to the connected client/s
+
+			buf := make([]byte, BufferSize)
+			for {
+				n, err := localConn.Read(buf)
+				if n > 0 {
+					originId := p.GetId()
+					forwardedResponse := protocol.NewPacket(originId, buf[:n])
+					err = protocol.SendPacket(forwardedResponse, conn)
+				}
+				if err != nil {
+					localConn.Close()
+					break
+				}
+			}
+
+			localConn.Close()
+		}
 	}
 }
 

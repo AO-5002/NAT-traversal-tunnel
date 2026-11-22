@@ -36,6 +36,8 @@ func main() {
 		log.Fatal("RELAY_SECRET not set")
 	}
 
+	// Create initial stream with sender
+
 	t := multiplexing.NewTunnelMux()
 	initConn, err := ln.Accept()
 	if err != nil {
@@ -45,9 +47,14 @@ func main() {
 
 	// Do initial auth-handshake
 
-	AuthHandshake(secret, initConn, t)
+	if !AuthHandshake(secret, initConn) {
+		log.Fatal("Auth handshake failed")
+	}
 
-	// Once the initial-setup handshake is done, we can begin accepting multiple clients
+	// Bind the sender-stream as the owner of the tunnel
+
+	t.BindOwner(initConn)
+	go t.Demux()
 
 	for {
 		conn, err := ln.Accept()
@@ -57,44 +64,57 @@ func main() {
 
 		// Create goroutines for every new connection & add to subscribers
 
-		go func() {
+		go func(conn net.Conn) {
 			defer conn.Close()
-
 			ClientSession(conn, t)
-
-		}()
+		}(conn)
 	}
 }
 
-func AuthHandshake(secret string, conn net.Conn, t *multiplexing.TunnelMux) {
+func AuthHandshake(secret string, conn net.Conn) bool {
 	p, err := protocol.RecvPacket(conn)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if multiplexing.Authorize(string(p.GetPayload()), secret) {
-
-		// Check if client is owner & bind it to the tunnel
-
 		if err := protocol.SendPacket(protocol.NewPacket(newStreamId(), []byte("OK")), conn); err != nil {
 			log.Fatal(err)
 		}
-
-		t.BindOwner(conn)
-	} else {
-		if err := protocol.SendPacket(protocol.NewPacket(newStreamId(), []byte("BAD")), conn); err != nil {
-			log.Fatal(err)
-		}
-		return
+		return true
 	}
+
+	if err := protocol.SendPacket(protocol.NewPacket(newStreamId(), []byte("BAD")), conn); err != nil {
+		log.Fatal(err)
+	}
+	return false
 }
 
 func ClientSession(conn net.Conn, t *multiplexing.TunnelMux) {
 
 	// Subscribe the connection to the tunnel with a newly generated id
 
-	//c := t.Subscribe(newStreamId())
+	id := newStreamId()
+	c := t.Subscribe(id)
 
-	// Read the request from the channel
+	// Receive request from connected client/s
 
+	buf := make([]byte, BufferSize)
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		// Forward raw bytes to owner-connection
+
+		t.Mux(id, buf[:n])
+
+		// Receive responses from owner-connection
+		response := <-c
+		if _, err := conn.Write(response); err != nil {
+			log.Fatal(err)
+		}
+	}
 }

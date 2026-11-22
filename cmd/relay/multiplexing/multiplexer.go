@@ -1,6 +1,8 @@
 package multiplexing
 
 import (
+	"NAT-tunnel-project/internal/protocol"
+	"fmt"
 	"net"
 	"sync"
 )
@@ -35,17 +37,47 @@ func (h *TunnelMux) BindOwner(con net.Conn) {
 	h.ownerCon = con
 }
 
-func (h *TunnelMux) Mux(id uint32) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+// Mux (Clients -> Owner)
+func (h *TunnelMux) Mux(id uint32, payload []byte) {
 
 	// Multiplexing action
 
+	p := protocol.NewPacket(id, payload)
+	h.mu.Lock()
+	err := protocol.SendPacket(p, h.ownerCon)
+	if err != nil {
+		fmt.Println(err)
+	}
+	h.mu.Unlock()
 }
 
-func (h *TunnelMux) Demux(con net.Conn) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+// Demux (Owner -> Clients)
+func (h *TunnelMux) Demux() {
 
-	// Demultiplexing action
+	// Demultiplexing action (route to proper channel)
+
+	for {
+		p, err := protocol.RecvPacket(h.ownerCon)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		// Extract id from the packet
+
+		packetId := p.GetId()
+
+		// Lookup & send to proper channel
+
+		h.mu.Lock()
+		c := h.subs[packetId]
+		h.mu.Unlock()
+
+		if c == nil {
+			fmt.Printf("No channel for stream ID %d\n", packetId)
+			continue
+		}
+
+		c <- p.GetPayload()
+	}
 }
