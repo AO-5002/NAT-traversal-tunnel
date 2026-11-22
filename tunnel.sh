@@ -23,6 +23,7 @@ if $CREATE_ENV; then
   read -p "Enter EC2 IPv4-address: " SSH_HOST
   read -p "Enter EC2 port (default 8080): " SSH_PORT
   read -p "Enter EC2 user (default ec2-user): " SSH_USER
+  read -p "Enter content location URL: " LOCAL_URL
   SSH_PORT="${SSH_PORT:-8080}"
   SSH_USER="${SSH_USER:-ec2-user}"
 

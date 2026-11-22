@@ -2,17 +2,14 @@ package main
 
 import (
 	"NAT-tunnel-project/internal/protocol"
-	"bufio"
 	"fmt"
-	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
 )
-
-const BufferSize = 1024
 
 func main() {
 
@@ -32,29 +29,49 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Printf("Connected to: %s\n", conn.RemoteAddr())
-	fmt.Print("Write something: ")
-
 	defer conn.Close()
-	buf := make([]byte, BufferSize)
 
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		line := scanner.Text()
-		_, err = conn.Write([]byte(line))
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		n, err := conn.Read(buf)
-		if err != nil {
-			if err == io.EOF {
-			}
-			fmt.Println(err)
-		}
-
-		fmt.Println(string(buf[:n]))
-		break
+	// Retrieve URL & key (optional)
+	url := os.Getenv("LOCAL_URL")
+	if url == "" {
+		log.Fatal(fmt.Errorf("LOCAL_URL not set"))
 	}
+
+	key := os.Getenv("RELAY_SECRET")
+	authenticated := authenticate(conn, key)
+
+	if authenticated {
+		fmt.Printf("Successfully connected to: %s\n", conn.RemoteAddr())
+		_, err := http.Post(url, "application/json", nil)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+	}
+}
+
+func authenticate(conn net.Conn, key string) bool {
+
+	if key == "" {
+		return false
+	}
+
+	// Create & Send packet to relay with the secret
+	p := protocol.NewPacket(0, []byte(key))
+	if err := protocol.SendPacket(p, conn); err != nil {
+		log.Fatal(err)
+	}
+
+	// Wait for recv & parse
+	p, err := protocol.RecvPacket(conn)
+	if err != nil {
+		return false
+	}
+
+	payload := p.GetPayload()
+	if string(payload) != "OK" {
+		return false
+	}
+
+	return true
 }

@@ -1,37 +1,23 @@
 package main
 
 import (
+	"NAT-tunnel-project/cmd/relay/multiplexing"
 	"NAT-tunnel-project/internal/protocol"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"sync"
+	"sync/atomic"
 )
 
 // EC2 Program
 
 const BufferSize = 1024
 
-type Hub struct {
-	mu    sync.Mutex
-	subs  map[net.Conn]chan []byte
-	pubId net.Conn
-}
+var nextStreamID atomic.Uint32
 
-func (h *Hub) subscribe(conn net.Conn) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.subs[conn] = make(chan []byte, BufferSize)
-}
-
-// Send the pub's message to every sub's channel
-func (h *Hub) broadcast(msg []byte) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	for _, ch := range h.subs {
-		ch <- msg
-	}
+func newStreamId() uint32 {
+	return nextStreamID.Add(1)
 }
 
 func main() {
@@ -43,38 +29,72 @@ func main() {
 	defer ln.Close()
 	fmt.Printf("Listening on %s:%s\n", protocol.DestAddr.Network, protocol.DestAddr.Port)
 
-	secret := os.Getenv("RELAY_SECRET")
+	// Obtain secret-key
+
+	var secret = os.Getenv("RELAY_SECRET")
 	if secret == "" {
 		log.Fatal("RELAY_SECRET not set")
 	}
-	log.Println("secret loaded:", secret[:8]+"...")
 
-	// Concurrency w/ Goroutines
+	t := multiplexing.NewTunnelMux()
+	initConn, err := ln.Accept()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer initConn.Close()
 
-	userCount := 0
+	// Do initial auth-handshake
+
+	AuthHandshake(secret, initConn, t)
+
+	// Once the initial-setup handshake is done, we can begin accepting multiple clients
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			fmt.Println(err)
 		}
-		userCount++
-		fmt.Printf("Accepted connection from (User #%v) %s\n", userCount, conn.RemoteAddr())
+
+		// Create goroutines for every new connection & add to subscribers
 
 		go func() {
 			defer conn.Close()
 
-			// Read data from client
-			buf := make([]byte, BufferSize)
-			n, err := recv(buf, conn)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
+			ClientSession(conn, t)
 
-			// Write "ACK" back to the client
-			if err := send(buf, n, conn); err != nil {
-				fmt.Println(err)
-			}
 		}()
 	}
+}
+
+func AuthHandshake(secret string, conn net.Conn, t *multiplexing.TunnelMux) {
+	p, err := protocol.RecvPacket(conn)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if multiplexing.Authorize(string(p.GetPayload()), secret) {
+
+		// Check if client is owner & bind it to the tunnel
+
+		if err := protocol.SendPacket(protocol.NewPacket(newStreamId(), []byte("OK")), conn); err != nil {
+			log.Fatal(err)
+		}
+
+		t.BindOwner(conn)
+	} else {
+		if err := protocol.SendPacket(protocol.NewPacket(newStreamId(), []byte("BAD")), conn); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+}
+
+func ClientSession(conn net.Conn, t *multiplexing.TunnelMux) {
+
+	// Subscribe the connection to the tunnel with a newly generated id
+
+	//c := t.Subscribe(newStreamId())
+
+	// Read the request from the channel
+
 }
