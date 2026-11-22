@@ -111,10 +111,16 @@ func ClientSession(conn net.Conn, t *multiplexing.TunnelMux) {
 
 		t.Mux(id, buf[:n])
 
-		// Receive responses from owner-connection
-		response := <-c
-		if _, err := conn.Write(response); err != nil {
-			log.Fatal(err)
+		// Receive response chunks until sentinel (empty payload)
+		for {
+			response := <-c
+			if len(response) == 0 {
+				break
+			}
+			if _, err := conn.Write(response); err != nil {
+				fmt.Println(err)
+				return
+			}
 		}
 	}
 }
