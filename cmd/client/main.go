@@ -75,6 +75,7 @@ func main() {
 
 				// Retarget to local service with correct host
 				req.RequestURI = ""
+				req.Host = ""
 				req.URL.Host = localURL
 				req.URL.Scheme = "http"
 
