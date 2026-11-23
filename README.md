@@ -1,4 +1,4 @@
-# NAT Tunnel
+# Relay Tunnel
 
 A from-scratch reverse tunnel in Go: expose a local server to the internet without port forwarding.
 
