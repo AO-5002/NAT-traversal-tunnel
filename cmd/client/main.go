@@ -2,9 +2,12 @@ package main
 
 import (
 	"NAT-tunnel-project/internal/protocol"
+	"bufio"
+	"bytes"
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"sync"
 
@@ -74,17 +77,28 @@ func main() {
 					return
 				}
 
-				buf := make([]byte, BufferSize)
-				for {
-					n, err := localConn.Read(buf)
-					if n > 0 {
-						mu.Lock()
-						protocol.SendPacket(protocol.NewPacket(originId, buf[:n]), conn)
-						mu.Unlock()
+				// Read exactly one complete HTTP response regardless of keep-alive
+				resp, err := http.ReadResponse(bufio.NewReader(localConn), nil)
+				if err != nil {
+					fmt.Printf("Error reading response: %s\n", err)
+					return
+				}
+				defer resp.Body.Close()
+
+				var buf bytes.Buffer
+				resp.Write(&buf)
+				data := buf.Bytes()
+
+				// Send response in chunks
+				for len(data) > 0 {
+					chunk := data
+					if len(chunk) > BufferSize {
+						chunk = data[:BufferSize]
 					}
-					if err != nil {
-						break
-					}
+					mu.Lock()
+					protocol.SendPacket(protocol.NewPacket(originId, chunk), conn)
+					mu.Unlock()
+					data = data[len(chunk):]
 				}
 
 				// Send sentinel to signal end of response
