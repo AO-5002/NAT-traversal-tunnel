@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+
 	"os"
 	"sync"
 
@@ -37,8 +38,8 @@ func main() {
 	defer conn.Close()
 
 	// Retrieve URL & key (optional)
-	url := os.Getenv("LOCAL_URL")
-	if url == "" {
+	localURL := os.Getenv("LOCAL_URL")
+	if localURL == "" {
 		log.Fatal(fmt.Errorf("LOCAL_URL not set"))
 	}
 
@@ -65,22 +66,22 @@ func main() {
 			go func(p *protocol.Packet) {
 				originId := p.GetId()
 
-				localConn, err := net.Dial(addr.Network, url)
+				// Parse the raw HTTP request bytes into a proper request
+				req, err := http.ReadRequest(bufio.NewReader(bytes.NewReader(p.GetPayload())))
 				if err != nil {
-					fmt.Printf("Failed to connect to local-host application on URL: %s: %s\n", url, err)
-					return
-				}
-				defer localConn.Close()
-
-				if _, err := localConn.Write(p.GetPayload()); err != nil {
-					fmt.Printf("Error forwarding payload: %s", err)
+					fmt.Printf("Error parsing request: %s\n", err)
 					return
 				}
 
-				// Read exactly one complete HTTP response regardless of keep-alive
-				resp, err := http.ReadResponse(bufio.NewReader(localConn), nil)
+				// Retarget to local service with correct host
+				req.RequestURI = ""
+				req.URL.Host = localURL
+				req.URL.Scheme = "http"
+
+				client := &http.Client{}
+				resp, err := client.Do(req)
 				if err != nil {
-					fmt.Printf("Error reading response: %s\n", err)
+					fmt.Printf("Error forwarding request: %s\n", err)
 					return
 				}
 				defer resp.Body.Close()
