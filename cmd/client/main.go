@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/joho/godotenv"
 )
@@ -44,6 +45,8 @@ func main() {
 	if authenticated {
 		fmt.Printf("Successfully connected to: %s\n", conn.RemoteAddr())
 
+		var mu sync.Mutex
+
 		for {
 
 			// Receive packet from connected-client
@@ -54,40 +57,41 @@ func main() {
 				return
 			}
 
-			// Create a TCP connection to local-url application.
+			// Spawn a goroutine per request so long-lived connections don't block the loop
 
-			localConn, err := net.Dial(addr.Network, url)
-			if err != nil {
-				fmt.Printf("Failed to connect to local-host application on URL: %s: %s\n", url, err)
-				log.Fatal(err)
-			}
+			go func(p *protocol.Packet) {
+				originId := p.GetId()
 
-			// Forward the request to connected local-host application
-
-			if _, err := localConn.Write(p.GetPayload()); err != nil {
-				fmt.Printf("Error forwarding payload: %s", err)
-				log.Fatal(err)
-			}
-
-			// Receive whatever bytes as a response and send it back to the connected client/s
-
-			originId := p.GetId()
-			buf := make([]byte, BufferSize)
-			for {
-				n, err := localConn.Read(buf)
-				if n > 0 {
-					forwardedResponse := protocol.NewPacket(originId, buf[:n])
-					protocol.SendPacket(forwardedResponse, conn)
-				}
+				localConn, err := net.Dial(addr.Network, url)
 				if err != nil {
-					localConn.Close()
-					break
+					fmt.Printf("Failed to connect to local-host application on URL: %s: %s\n", url, err)
+					return
 				}
-			}
+				defer localConn.Close()
 
-			// Send sentinel to signal end of response
-			protocol.SendPacket(protocol.NewPacket(originId, []byte{}), conn)
-			localConn.Close()
+				if _, err := localConn.Write(p.GetPayload()); err != nil {
+					fmt.Printf("Error forwarding payload: %s", err)
+					return
+				}
+
+				buf := make([]byte, BufferSize)
+				for {
+					n, err := localConn.Read(buf)
+					if n > 0 {
+						mu.Lock()
+						protocol.SendPacket(protocol.NewPacket(originId, buf[:n]), conn)
+						mu.Unlock()
+					}
+					if err != nil {
+						break
+					}
+				}
+
+				// Send sentinel to signal end of response
+				mu.Lock()
+				protocol.SendPacket(protocol.NewPacket(originId, []byte{}), conn)
+				mu.Unlock()
+			}(p)
 		}
 	}
 }
